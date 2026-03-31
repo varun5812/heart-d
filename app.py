@@ -1,16 +1,31 @@
-import streamlit as st
+﻿import streamlit as st
 import pandas as pd
 import joblib
+from pathlib import Path
 
-# Load saved model, scaler, and expected columns
-model = joblib.load("knn_heart_model.pkl")
-scaler = joblib.load("heart_scaler.pkl")
-expected_columns = joblib.load("heart_columns.pkl")
+BASE_DIR = Path(__file__).resolve().parent
 
-st.title("Heart Stroke Prediction by Varun")
-st.markdown("Provide the following details to check your heart stroke risk:")
 
-# Collect user input
+def load_artifact(filename: str):
+    return joblib.load(BASE_DIR / filename)
+
+
+model = load_artifact("knn_heart_model.pkl")
+scaler = load_artifact("heart_scaler.pkl")
+expected_columns = load_artifact("heart_columns.pkl")
+
+if callable(expected_columns):
+    expected_columns = expected_columns()
+elif hasattr(expected_columns, "tolist"):
+    expected_columns = expected_columns.tolist()
+elif isinstance(expected_columns, dict):
+    expected_columns = list(expected_columns.keys())
+else:
+    expected_columns = list(expected_columns)
+
+st.title("Heart Disease Prediction by Varun")
+st.markdown("Provide the following details to check your heart disease risk:")
+
 age = st.slider("Age", 18, 100, 40)
 sex = st.selectbox("Sex", ["M", "F"])
 chest_pain = st.selectbox("Chest Pain Type", ["ATA", "NAP", "TA", "ASY"])
@@ -23,43 +38,33 @@ exercise_angina = st.selectbox("Exercise-Induced Angina", ["Y", "N"])
 oldpeak = st.slider("Oldpeak (ST Depression)", 0.0, 6.0, 1.0)
 st_slope = st.selectbox("ST Slope", ["Up", "Flat", "Down"])
 
-# When Predict is clicked
 if st.button("Predict"):
-
-    # Create a raw input dictionary
     raw_input = {
-        'Age': age,
-        'RestingBP': resting_bp,
-        'Cholesterol': cholesterol,
-        'FastingBS': fasting_bs,
-        'MaxHR': max_hr,
-        'Oldpeak': oldpeak,
-        'Sex_' + sex: 1,
-        'ChestPainType_' + chest_pain: 1,
-        'RestingECG_' + resting_ecg: 1,
-        'ExerciseAngina_' + exercise_angina: 1,
-        'ST_Slope_' + st_slope: 1
+        "Age": age,
+        "RestingBP": resting_bp,
+        "Cholesterol": cholesterol,
+        "FastingBS": fasting_bs,
+        "MaxHR": max_hr,
+        "Oldpeak": oldpeak,
+        "Sex_" + sex: 1,
+        "ChestPainType_" + chest_pain: 1,
+        "RestingECG_" + resting_ecg: 1,
+        "ExerciseAngina_" + exercise_angina: 1,
+        "ST_Slope_" + st_slope: 1,
     }
 
-    # Create input dataframe
     input_df = pd.DataFrame([raw_input])
 
-    # Fill in missing columns with 0s
-    for col in expected_columns.keys():
+    for col in expected_columns:
         if col not in input_df.columns:
             input_df[col] = 0
 
-    # Reorder columns
-    input_df = input_df[expected_columns]
+    input_df = input_df.reindex(columns=expected_columns, fill_value=0)
 
-    # Scale the input
     scaled_input = scaler.transform(input_df)
-
-    # Make prediction
     prediction = model.predict(scaled_input)[0]
 
-    # Show result
     if prediction == 1:
-        st.error("⚠️ High Risk of Heart Disease")
+        st.error("High Risk of Heart Disease")
     else:
-        st.success("✅ Low Risk of Heart Disease")
+        st.success("Low Risk of Heart Disease")
